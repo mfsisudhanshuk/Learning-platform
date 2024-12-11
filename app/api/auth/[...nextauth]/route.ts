@@ -1,12 +1,19 @@
-import NextAuth from "next-auth"
+import NextAuth, { AuthOptions, DefaultSession } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { MongoDBAdapter } from "@next-auth/mongodb-adapter"
-import clientPromise from "@/lib/mongodb"
+
 import bcrypt from "bcryptjs"
 import User from "@/models/User"
+import dbConnect from "@/lib/mongodb"
 
-export const authOptions = {
-  adapter: MongoDBAdapter(clientPromise),
+declare module "next-auth" {
+  interface Session extends DefaultSession {
+    user: {
+      id: string;
+    } & DefaultSession["user"]
+  }
+}
+
+export const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -19,6 +26,7 @@ export const authOptions = {
           return null
         }
 
+        await dbConnect()
         const user = await User.findOne({ email: credentials.email })
 
         if (!user) {
@@ -53,7 +61,9 @@ export const authOptions = {
       return token
     },
     async session({ session, token }) {
-      session.user.id = token.id
+      if (session.user) {
+        session.user.id = token.id as string
+      }
       return session
     },
   },
